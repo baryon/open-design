@@ -251,6 +251,53 @@ export const AGENT_DEFS = [
     },
     streamFormat: 'plain',
   },
+  {
+    id: 'copilot',
+    name: 'GitHub Copilot CLI',
+    bin: 'copilot',
+    versionArgs: ['--version'],
+    // `--allow-all-tools` is required for non-interactive runs: without it
+    // the CLI blocks waiting for human approval on every tool call. Unlike
+    // Codex (where `exec` is a dedicated headless subcommand with
+    // auto-approve baked in) or Claude Code (which inherits its permission
+    // policy from the user's settings.json), Copilot's `-p` mode always
+    // prompts unless this flag is passed explicitly.
+    //
+    // `--output-format json` produces JSONL that copilot-stream.js parses
+    // into the same typed events as claude-stream.js.
+    //
+    // `--add-dir` (repeatable, same flag as Claude Code's) widens Copilot's
+    // path-level sandbox to skill seeds + design-system specs outside the
+    // project cwd.
+    //
+    // No `models` subcommand; the CLI accepts whatever the user's Copilot
+    // subscription exposes. Ship a small evidence-based hint list — the
+    // default we observed in the JSON stream and the example from
+    // `copilot --help`. Users can paste any other id via Settings.
+    fallbackModels: [
+      DEFAULT_MODEL_OPTION,
+      { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
+      { id: 'gpt-5.2', label: 'GPT-5.2' },
+    ],
+    buildArgs: (prompt, _imagePaths, extraAllowedDirs = [], options = {}) => {
+      const args = [
+        '-p',
+        prompt,
+        '--allow-all-tools',
+        '--output-format',
+        'json',
+      ];
+      if (options.model && options.model !== 'default') {
+        args.push('--model', options.model);
+      }
+      const dirs = (extraAllowedDirs || []).filter(
+        (d) => typeof d === 'string' && d.length > 0,
+      );
+      for (const d of dirs) args.push('--add-dir', d);
+      return args;
+    },
+    streamFormat: 'copilot-stream-json',
+  },
 ];
 
 function resolveOnPath(bin) {
